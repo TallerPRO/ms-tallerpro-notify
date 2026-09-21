@@ -1,0 +1,70 @@
+spring:
+  application:
+    name: ms-tallerpro-notify
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        acknowledge-mode: auto
+        # Un mensaje que agota los reintentos se rechaza SIN reencolar -> DLX -> q.cmd.*.dlq
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000
+          multiplier: 2.0
+          max-interval: 10000
+  mail:
+    host: ${SMTP_HOST:}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USER:}
+    password: ${SMTP_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://login.microsoftonline.com/${AZURE_TENANT_ID:tenant-id}/v2.0
+          audiences: api://${AZURE_API_CLIENT_ID:api-client-id}
+
+server:
+  port: ${SERVER_PORT:8083}
+
+tallerpro:
+  security:
+    jwt-enabled: ${TALLERPRO_JWT_ENABLED:true}
+    dev-roles: ${TALLERPRO_DEV_ROLES:Admin}
+  notify:
+    # Debe coincidir con tallerpro.jobs.rabbitmq de ms-tallerpro-jobs
+    rabbitmq:
+      exchange-cmd: cmd.direct
+      exchange-dlx: cmd.dead.dlx
+      queue-email: q.cmd.email
+      queue-bay: q.cmd.bay
+      queue-quote: q.cmd.quote
+    email:
+      remitente: ${SMTP_FROM:no-reply@tallerpro.cl}
+      # true + SMTP_HOST -> envio real; false -> el correo se registra en el log
+      habilitado: ${SMTP_ENABLED:false}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  health:
+    mail:
+      enabled: false
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.ms_tallerpro.notify: INFO

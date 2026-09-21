@@ -1,0 +1,8 @@
+spring:
+  rabbitmq:
+    listener:
+      simple:
+        auto-startup: false   # sin broker en los tests
+tallerpro:
+  security:
+    jwt-enabled: true
