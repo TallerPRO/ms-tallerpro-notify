@@ -103,11 +103,39 @@ public class NotificacionService {
         if (!"TICKET_BAHIA".equals(c.tipo())) {
             throw new IllegalArgumentException("Tipo de ticket desconocido: " + c.tipo());
         }
-        String mecanico = c.texto("mecanicoId");
-        String bahia = c.texto("bahiaId");
-        String asunto = "Ticket de trabajo: orden %s en bahia %s".formatted(c.ordenId(), bahia);
-        log.info("[TICKET BAHIA] mecanico={} bahia={} orden={}", mecanico, bahia, c.ordenId());
-        return nueva(c, mecanico, asunto, EstadoNotificacion.ENVIADA, "Ticket impreso/push al mecanico");
+        String mecanicoId = c.texto("mecanicoId");
+        String mecanico = Optional.ofNullable(c.texto("mecanicoNombre")).orElse("mecanico");
+        // El codigo ("A-01") es lo que el mecanico reconoce; si jobs no lo pudo
+        // leer del catalogo, se cae al UUID antes que dejar el aviso sin bahia.
+        String bahia = Optional.ofNullable(c.texto("bahiaCodigo")).orElse(c.texto("bahiaId"));
+        String patente = Optional.ofNullable(c.texto("patente")).orElse("(sin patente)");
+        String contacto = c.texto("contacto");
+
+        String diagnostico = c.texto("diagnostico");
+        String observaciones = c.texto("observaciones");
+
+        String asunto = "Tienes un trabajo asignado en la bahia %s".formatted(bahia);
+        StringBuilder cuerpo = new StringBuilder(
+                "Hola %s, se te asigno la orden %s (vehiculo %s) en la bahia %s. El vehiculo ya esta en el puesto."
+                        .formatted(mecanico, c.ordenId(), patente, bahia));
+        // El mecanico necesita el detalle del trabajo en el mismo aviso.
+        if (diagnostico != null && !diagnostico.isBlank()) {
+            cuerpo.append("\n\nDiagnostico: ").append(diagnostico);
+        }
+        if (observaciones != null && !observaciones.isBlank()) {
+            cuerpo.append("\nObservaciones: ").append(observaciones);
+        }
+
+        if (contacto == null || contacto.isBlank()) {
+            // Sin correo del mecanico el ticket sigue siendo valido: queda en el
+            // log/tablero del taller, igual que antes de tener catalogo de mecanicos.
+            log.info("[TICKET BAHIA] mecanico={} bahia={} orden={} (sin correo)", mecanicoId, bahia, c.ordenId());
+            return nueva(c, mecanicoId, asunto, EstadoNotificacion.ENVIADA, "Ticket impreso/push al mecanico");
+        }
+
+        String detalle = emailSender.enviar(contacto, asunto, cuerpo.toString());
+        log.info("[TICKET BAHIA] aviso enviado a {} (bahia={}, orden={})", contacto, bahia, c.ordenId());
+        return nueva(c, contacto, asunto, EstadoNotificacion.ENVIADA, detalle);
     }
 
     // ---------- q.cmd.quote ----------
