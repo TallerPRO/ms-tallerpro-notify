@@ -1,0 +1,36 @@
+# ms-tallerpro-notify (sin BD: estado en memoria). Requiere la infraestructura
+# levantada antes (../docker-compose.infra.yml): red tallerpro-net y RabbitMQ.
+#
+#   docker compose up -d --build
+#
+# Consume q.cmd.email / q.cmd.bay / q.cmd.quote; 3 reintentos y luego q.cmd.*.dlq.
+# Con SMTP_ENABLED=false (default) el correo solo se registra en el log.
+name: tallerpro-notify
+
+services:
+  ms-tallerpro-notify:
+    build: .
+    image: tallerpro/ms-tallerpro-notify:latest
+    container_name: ms-tallerpro-notify
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      TALLERPRO_JWT_ENABLED: ${TALLERPRO_JWT_ENABLED:-false}
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID:-tenant-id}
+      AZURE_API_CLIENT_ID: ${AZURE_API_CLIENT_ID:-api-client-id}
+    networks:
+      - tallerpro-net
+
+networks:
+  tallerpro-net:
+    external: true
