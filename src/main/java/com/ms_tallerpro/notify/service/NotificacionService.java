@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -55,6 +56,10 @@ public class NotificacionService {
 
     public List<Notificacion> recientes(int limite) {
         return repository.recientes(limite);
+    }
+
+    public Optional<Notificacion> porEventId(String eventId) {
+        return repository.porEventId(eventId);
     }
 
     // ---------- q.cmd.email ----------
@@ -147,16 +152,39 @@ public class NotificacionService {
             case "ORDEN_TRABAJO_FINAL" -> "Orden de trabajo final %s".formatted(c.ordenId());
             default -> throw new IllegalArgumentException("Tipo de documento desconocido: " + c.tipo());
         };
-        log.info("[PDF generado] {}", asunto);
-        return nueva(c, null, asunto, EstadoNotificacion.ENVIADA, "PDF generado (simulado)");
+
+        List<String> lineas = new ArrayList<>();
+        lineas.add("Orden: " + c.ordenId());
+        if (c.texto("patente") != null) lineas.add("Patente: " + c.texto("patente"));
+        if (c.texto("repuestos") != null) lineas.add("Repuestos utilizados: " + c.texto("repuestos"));
+        if (c.texto("total") != null) lineas.add("Total: $" + c.texto("total"));
+
+        byte[] pdf = PdfGenerator.generar(asunto, lineas);
+        log.info("[PDF generado] {} ({} bytes)", asunto, pdf.length);
+
+        String contacto = c.texto("contacto");
+        if (contacto == null || contacto.isBlank()) {
+            // Sin contacto del cliente: el PDF queda disponible solo para descarga
+            // por el endpoint interno (GET /api/v1/notificaciones/{eventId}/pdf).
+            return nueva(c, null, asunto, EstadoNotificacion.ENVIADA, "PDF generado (sin contacto)", pdf);
+        }
+        String detalle = emailSender.enviarConAdjunto(contacto, asunto,
+                "Adjunto el documento de tu orden %s.".formatted(c.ordenId()),
+                "documento-%s.pdf".formatted(c.eventId()), pdf);
+        return nueva(c, contacto, asunto, EstadoNotificacion.ENVIADA, detalle, pdf);
     }
 
     private static Notificacion nueva(ComandoNotificacion c, String destinatario, String asunto,
                                       EstadoNotificacion estado, String detalle) {
-        return new Notificacion(c.eventId(), c.canal(), c.tipo(), c.ordenId(), destinatario, asunto, estado, detalle, Instant.now());
+        return nueva(c, destinatario, asunto, estado, detalle, null);
+    }
+
+    private static Notificacion nueva(ComandoNotificacion c, String destinatario, String asunto,
+                                      EstadoNotificacion estado, String detalle, byte[] pdf) {
+        return new Notificacion(c.eventId(), c.canal(), c.tipo(), c.ordenId(), destinatario, asunto, estado, detalle, Instant.now(), pdf);
     }
 
     private static Notificacion conEstado(Notificacion n, EstadoNotificacion estado) {
-        return new Notificacion(n.eventId(), n.canal(), n.tipo(), n.ordenId(), n.destinatario(), n.asunto(), estado, n.detalle(), Instant.now());
+        return new Notificacion(n.eventId(), n.canal(), n.tipo(), n.ordenId(), n.destinatario(), n.asunto(), estado, n.detalle(), Instant.now(), n.pdf());
     }
 }

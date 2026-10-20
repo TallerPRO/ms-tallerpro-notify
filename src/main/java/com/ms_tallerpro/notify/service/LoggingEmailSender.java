@@ -18,4 +18,11 @@ public class LoggingEmailSender implements EmailSender {
         log.info("[EMAIL simulado] para={} asunto=\"{}\" cuerpo=\"{}\"", destinatario, asunto, cuerpo);
         return "LOG -> " + destinatario;
     }
+
+    @Override
+    public String enviarConAdjunto(String destinatario, String asunto, String cuerpo, String nombreAdjunto, byte[] adjunto) {
+        log.info("[EMAIL simulado] para={} asunto=\"{}\" cuerpo=\"{}\" adjunto={} ({} bytes)",
+                destinatario, asunto, cuerpo, nombreAdjunto, adjunto == null ? 0 : adjunto.length);
+        return "LOG -> " + destinatario;
+    }
 }

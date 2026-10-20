@@ -16,5 +16,6 @@ public record Notificacion(
         String asunto,
         EstadoNotificacion estado,
         String detalle,
-        Instant fecha
+        Instant fecha,
+        byte[] pdf
 ) {}
