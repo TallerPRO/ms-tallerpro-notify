@@ -1,0 +1,61 @@
+# Agregar estos servicios a compose-apps.yml (ec2-apps), junto a jobs-svc,
+# catalog-svc, audit-svc, report-svc. notify-svc no tiene base de datos propia
+# (consume RabbitMQ) y NO se expone publicamente (no se rutea en el gateway,
+# ver DAS seccion 5): no necesita publicar puerto hacia afuera de la red.
+#
+# IMPORTANTE: revisar con el compañero de despliegue si "rabbitmq" ya existe
+# en el compose-apps.yml actual de EC2. Si ya existe, borrar el bloque
+# "rabbitmq:" de aqui abajo (dejar solo notify-svc) y usar el hostname real
+# que ya tengan configurado en jobs-svc (RABBITMQ_HOST).
+
+services:
+  # Si RabbitMQ ya esta desplegado en EC2, eliminar este bloque.
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: tallerpro-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - tallerpro-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  notify-svc:
+    build:
+      context: ../ms-tallerpro-notify
+      dockerfile: Dockerfile
+    container_name: tallerpro-notify-svc
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID}
+      AZURE_API_CLIENT_ID: ${AZURE_API_CLIENT_ID}
+      # Cuenta Gmail remitente: requiere verificacion en 2 pasos + "contraseña
+      # de aplicacion" (no la contraseña normal). Definir SMTP_USER y
+      # SMTP_PASSWORD como secrets en el servidor, nunca en este archivo.
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_USER}
+      SMTP_ENABLED: "true"
+    networks:
+      - tallerpro-net
+
+volumes:
+  rabbitmq-data:
+
+networks:
+  tallerpro-net:
+    external: true
