@@ -25,11 +25,6 @@ spring:
     properties:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
-      # Sin timeouts JavaMail espera indefinidamente: un SMTP colgado bloquearia el hilo
-      # del listener de RabbitMQ. Al expirar, el envio falla -> reintentos -> DLQ.
-      mail.smtp.connectiontimeout: 5000
-      mail.smtp.timeout: 5000
-      mail.smtp.writetimeout: 5000
   security:
     oauth2:
       resourceserver:
